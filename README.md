@@ -11,6 +11,7 @@ A simple, self-hosted personal finance web app with a Bengali interface. Plain P
 - ধার নেওয়া/দেওয়া এবং পরিশোধের হিসাব, বাকি পরিমাণ ও অবস্থাসহ
 - ক্যাটাগরি ও সাব-ক্যাটাগরি, মাসিক বাজেট
 - মাসিক রিপোর্ট ও চার্ট
+- হিসাব যাচাই — সব লেনদেন থেকে ব্যালেন্স নতুন করে হিসাব করে অমিল দেখায় ও ঠিক করার সুযোগ দেয়
 - একাধিক ব্যবহারকারী — প্রত্যেকে শুধু নিজের হিসাব দেখেন
 
 ---
@@ -20,7 +21,10 @@ A simple, self-hosted personal finance web app with a Bengali interface. Plain P
 - Loans you took or gave, with repayments, remaining amount and status
 - Categories with sub-categories, and budgets per category
 - Monthly reports with charts
+- Balance check: recomputes every balance from the transactions, lists mismatches and offers fixes
 - Multi-user: each person sees only their own data
+
+All money movement lives in `ledger.php`; pages call `ledger_create`, `ledger_update` and `ledger_delete` rather than touching balances themselves.
 
 ## প্রয়োজন · Requirements
 

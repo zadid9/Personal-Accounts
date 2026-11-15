@@ -1,197 +1,63 @@
 <?php
 require_once 'auth.php';
-require_once 'config.php';
+require_once 'ledger.php';
 
 $user_id = $_SESSION['id'];
-$loan_id = $amount = $transaction_date = $description = '';
-$account_id = '';
-$loan_id_err = $amount_err = $date_err = $account_err = '';
 
-// Fetch user's outstanding loans (both borrowed and lent) for dropdowns
-$loans = [];
-$sql_loans = "SELECT id, party_name, type, amount, paid_amount FROM loans WHERE user_id = ? AND status != 'fully_paid'";
-if ($stmt_loans = mysqli_prepare($link, $sql_loans)) {
-    mysqli_stmt_bind_param($stmt_loans, "i", $user_id);
-    mysqli_stmt_execute($stmt_loans);
-    $result_loans = mysqli_stmt_get_result($stmt_loans);
-    while ($row = mysqli_fetch_assoc($result_loans)) {
-        $loans[] = $row;
-    }
-    mysqli_stmt_close($stmt_loans);
-}
+$stmt = mysqli_prepare($link, "SELECT id, party_name, type, amount, paid_amount FROM loans WHERE user_id = ? AND status != 'fully_paid' ORDER BY party_name");
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+$loans = mysqli_fetch_all(mysqli_stmt_get_result($stmt), MYSQLI_ASSOC);
+mysqli_stmt_close($stmt);
 
-// Fetch user's accounts for dropdowns
-$accounts = [];
-$sql_accounts = "SELECT id, name, type, current_balance FROM accounts WHERE user_id = ? ORDER BY name";
-if ($stmt_accounts = mysqli_prepare($link, $sql_accounts)) {
-    mysqli_stmt_bind_param($stmt_accounts, "i", $user_id);
-    mysqli_stmt_execute($stmt_accounts);
-    $result_accounts = mysqli_stmt_get_result($stmt_accounts);
-    while ($row = mysqli_fetch_assoc($result_accounts)) {
-        $accounts[] = $row;
-    }
-    mysqli_stmt_close($stmt_accounts);
-}
+$stmt = mysqli_prepare($link, "SELECT id, name, type, current_balance FROM accounts WHERE user_id = ? ORDER BY name");
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+$accounts = mysqli_fetch_all(mysqli_stmt_get_result($stmt), MYSQLI_ASSOC);
+mysqli_stmt_close($stmt);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $loan_id = trim($_POST['loan_id']);
-    $amount = trim($_POST['amount']);
-    $transaction_date = trim($_POST['transaction_date']);
-    $description = trim($_POST['description']);
-    $account_id = trim($_POST['account_id']);
+$loan_id = (int)($_POST['loan_id'] ?? $_GET['loan_id'] ?? 0);
+$account_id = (int)($_POST['account_id'] ?? 0);
+$amount = trim($_POST['amount'] ?? '');
+$transaction_date = trim($_POST['transaction_date'] ?? date('Y-m-d'));
+$description = trim($_POST['description'] ?? '');
+$errors = [];
+$form_err = '';
 
-    // Basic Validations
-    if (empty($loan_id)) { $loan_id_err = 'অনুগ্রহ করে একটি ধার/ঋণ নির্বাচন করুন।'; }
-    if (empty($amount) || !is_numeric($amount) || $amount <= 0) { $amount_err = 'পরিমাণের জন্য একটি বৈধ ধনাত্মক সংখ্যা লিখুন।'; }
-    if (empty($transaction_date)) { $date_err = 'অনুগ্রহ করে একটি তারিখ লিখুন।'; }
-    if (empty($account_id)) { $account_err = 'অনুগ্রহ করে একটি অ্যাকাউন্ট নির্বাচন করুন।'; }
-
-    if (!$loan_id_err && !in_array((int)$loan_id, array_map('intval', array_column($loans, 'id')), true)) {
-        $loan_id_err = 'অবৈধ ধার/ঋণ নির্বাচন করা হয়েছে।';
-    }
-    if (!$account_err && !in_array((int)$account_id, array_map('intval', array_column($accounts, 'id')), true)) {
-        $account_err = 'অবৈধ অ্যাকাউন্ট নির্বাচন করা হয়েছে।';
-    }
-
-    // If no validation errors, proceed with database operations
-    if (empty($loan_id_err) && empty($amount_err) && empty($date_err) && empty($account_err)) {
-        // Find the loan type to determine transaction type
-        $loan_type = '';
-        foreach ($loans as $loan) {
-            if ($loan['id'] == $loan_id) {
-                $loan_type = $loan['type'];
-                break;
-            }
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $loan_kind = null;
+    foreach ($loans as $loan) {
+        if ((int)$loan['id'] === $loan_id) {
+            $loan_kind = $loan['type'];
         }
+    }
+    // A repayment on a borrowed loan leaves your account; on a lent loan it comes in.
+    $type = $loan_kind === 'lent' ? 'loan_repayment_received' : 'loan_repayment_made';
 
-        $transaction_type = '';
-        if ($loan_type == 'borrowed') {
-            $transaction_type = 'loan_repayment_made';
-            $from_account_id = $account_id;
-            $to_account_id = null;
-        } elseif ($loan_type == 'lent') {
-            $transaction_type = 'loan_repayment_received';
-            $from_account_id = null;
-            $to_account_id = $account_id;
-        }
+    [$d, $errors] = ledger_validate([
+        'type' => $type,
+        'amount' => $amount,
+        'transaction_date' => $transaction_date,
+        'description' => $description,
+        'loan_id' => $loan_id,
+        'from_account_id' => $account_id,
+        'to_account_id' => $account_id,
+    ], $accounts, $loans);
 
-        // Start transaction for atomicity
-        mysqli_begin_transaction($link);
-        $success = true;
-
+    if (!$errors) {
         try {
-            // Update the loan's paid_amount
-            $sql_update_loan = "UPDATE loans SET paid_amount = paid_amount + ? WHERE id = ? AND user_id = ?";
-            if ($stmt_update = mysqli_prepare($link, $sql_update_loan)) {
-                mysqli_stmt_bind_param($stmt_update, "dii", $amount, $loan_id, $user_id);
-                if (!mysqli_stmt_execute($stmt_update)) {
-                    $success = false;
-                }
-                mysqli_stmt_close($stmt_update);
-            } else {
-                $success = false;
-            }
-
-            // Update account balance
-            if ($success) {
-                if ($transaction_type == 'loan_repayment_made') {
-                    $sql_update_account = "UPDATE accounts SET current_balance = current_balance - ? WHERE id = ? AND user_id = ?";
-                    if ($stmt_update_acc = mysqli_prepare($link, $sql_update_account)) {
-                        mysqli_stmt_bind_param($stmt_update_acc, "dii", $amount, $from_account_id, $user_id);
-                        if (!mysqli_stmt_execute($stmt_update_acc)) {
-                            $success = false;
-                        }
-                        mysqli_stmt_close($stmt_update_acc);
-                    } else {
-                        $success = false;
-                    }
-                } elseif ($transaction_type == 'loan_repayment_received') {
-                    $sql_update_account = "UPDATE accounts SET current_balance = current_balance + ? WHERE id = ? AND user_id = ?";
-                    if ($stmt_update_acc = mysqli_prepare($link, $sql_update_account)) {
-                        mysqli_stmt_bind_param($stmt_update_acc, "dii", $amount, $to_account_id, $user_id);
-                        if (!mysqli_stmt_execute($stmt_update_acc)) {
-                            $success = false;
-                        }
-                        mysqli_stmt_close($stmt_update_acc);
-                    } else {
-                        $success = false;
-                    }
-                }
-            }
-
-            // Insert a new transaction record
-            if ($success) {
-                $sql_insert_transaction = "INSERT INTO transactions (user_id, transaction_date, amount, description, type, from_account_id, to_account_id, loan_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-                if ($stmt_insert = mysqli_prepare($link, $sql_insert_transaction)) {
-                    $to_account_id_to_bind = ($to_account_id === null) ? NULL : $to_account_id;
-                    $from_account_id_to_bind = ($from_account_id === null) ? NULL : $from_account_id;
-                    mysqli_stmt_bind_param($stmt_insert, "isdssiii", $user_id, $transaction_date, $amount, $description, $transaction_type, $from_account_id_to_bind, $to_account_id_to_bind, $loan_id);
-
-                    if (!mysqli_stmt_execute($stmt_insert)) {
-                        $success = false;
-                    }
-                    mysqli_stmt_close($stmt_insert);
-                } else {
-                    $success = false;
-                }
-            }
-
-
-            // Check if loan is fully paid and update status
-            if ($success) {
-                $sql_check_loan = "SELECT amount, paid_amount FROM loans WHERE id = ? AND user_id = ?";
-                if ($stmt_check_loan = mysqli_prepare($link, $sql_check_loan)) {
-                    mysqli_stmt_bind_param($stmt_check_loan, "ii", $loan_id, $user_id);
-                    mysqli_stmt_execute($stmt_check_loan);
-                    mysqli_stmt_bind_result($stmt_check_loan, $total_amount, $paid_amount);
-                    mysqli_stmt_fetch($stmt_check_loan);
-                    mysqli_stmt_close($stmt_check_loan);
-
-                    if ($paid_amount >= $total_amount) {
-                        $sql_update_status = "UPDATE loans SET status = 'fully_paid' WHERE id = ? AND user_id = ?";
-                        if ($stmt_update_status = mysqli_prepare($link, $sql_update_status)) {
-                            mysqli_stmt_bind_param($stmt_update_status, "ii", $loan_id, $user_id);
-                            if (!mysqli_stmt_execute($stmt_update_status)) {
-                                $success = false;
-                            }
-                            mysqli_stmt_close($stmt_update_status);
-                        } else {
-                            $success = false;
-                        }
-                    } else {
-                        $sql_update_status = "UPDATE loans SET status = 'partially_paid' WHERE id = ? AND user_id = ?";
-                        if ($stmt_update_status = mysqli_prepare($link, $sql_update_status)) {
-                            mysqli_stmt_bind_param($stmt_update_status, "ii", $loan_id, $user_id);
-                            if (!mysqli_stmt_execute($stmt_update_status)) {
-                                $success = false;
-                            }
-                            mysqli_stmt_close($stmt_update_status);
-                        } else {
-                            $success = false;
-                        }
-                    }
-                } else {
-                    $success = false;
-                }
-            }
-
-            if ($success) {
-                mysqli_commit($link);
-                header('location: view_loans.php');
-            } else {
-                mysqli_rollback($link);
-                echo 'পরিশোধ যোগ করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
-            }
-
-        } catch (Exception $e) {
-            mysqli_rollback($link);
-            echo 'একটি অপ্রত্যাশিত ত্রুটি হয়েছে: ' . $e->getMessage();
+            ledger_create($link, $user_id, $d);
+            header('location: view_loans.php');
+            exit;
+        } catch (Throwable $e) {
+            error_log('record_repayment: ' . $e->getMessage());
+            $form_err = 'পরিশোধ যোগ করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।';
         }
     }
-    mysqli_close($link);
 }
-?>
 
+$account_err = $errors['from_account_id'] ?? $errors['to_account_id'] ?? '';
+?>
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -204,6 +70,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php include 'navbar.php'; ?>
     <div class="container">
         <h2>ধার/ঋণ পরিশোধ যোগ করুন</h2>
+
+        <?php if ($form_err): ?>
+            <div style="color:#c0392b; background:#fdecea; padding:10px; border-radius:5px; margin-bottom:15px;"><?php echo e($form_err); ?></div>
+        <?php endif; ?>
+
+        <?php if (!$loans): ?>
+            <p>কোনো বকেয়া ধার/ঋণ নেই। <a href="add_loan.php">নতুন ধার/ঋণ যোগ করুন</a></p>
+        <?php else: ?>
         <form action="record_repayment.php" method="post">
             <?php echo csrf_field(); ?>
             <div>
@@ -211,49 +85,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <select name="loan_id">
                     <option value="">নির্বাচন করুন</option>
                     <?php foreach ($loans as $loan): ?>
-                        <option value="<?php echo $loan['id']; ?>">
-                            <?php
-                                $loan_type_text = ($loan['type'] == 'borrowed') ? 'গ্রহণ' : 'প্রদান';
-                                $balance = $loan['amount'] - $loan['paid_amount'];
-                                $balance_text = ($balance <= 0) ? ' (পরিশোধিত)' : ' (বাকি: BDT ' . number_format($balance, 2) . ')';
-                                echo htmlspecialchars($loan['party_name'] . ' (প্রকার: ' . $loan_type_text . ') - BDT ' . number_format($loan['amount'], 2) . $balance_text);
-                            ?>
+                        <?php
+                            $kind = $loan['type'] === 'borrowed' ? 'আপনি নিয়েছেন' : 'আপনি দিয়েছেন';
+                            $remaining = $loan['amount'] - $loan['paid_amount'];
+                        ?>
+                        <option value="<?php echo (int)$loan['id']; ?>" <?php echo (int)$loan['id'] === $loan_id ? 'selected' : ''; ?>>
+                            <?php echo e($loan['party_name'] . ' (' . $kind . ') - BDT ' . number_format((float)$loan['amount'], 2) . ' (বাকি: BDT ' . number_format($remaining, 2) . ')'); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <span><?php echo $loan_id_err; ?></span>
+                <span><?php echo e($errors['loan_id'] ?? ''); ?></span>
             </div>
             <div>
                 <label>পরিশোধের পরিমাণ (BDT):</label>
-                <input type="number" name="amount" step="0.01" value="<?php echo htmlspecialchars($amount); ?>">
-                <span><?php echo $amount_err; ?></span>
+                <input type="number" name="amount" step="0.01" min="0.01" value="<?php echo e($amount); ?>">
+                <span><?php echo e($errors['amount'] ?? ''); ?></span>
             </div>
             <div>
                 <label>তারিখ:</label>
-                <input type="date" name="transaction_date" value="<?php echo htmlspecialchars($transaction_date); ?>">
-                <span><?php echo $date_err; ?></span>
+                <input type="date" name="transaction_date" value="<?php echo e($transaction_date); ?>">
+                <span><?php echo e($errors['transaction_date'] ?? ''); ?></span>
             </div>
             <div>
                 <label>অ্যাকাউন্ট:</label>
                 <select name="account_id">
                     <option value="">নির্বাচন করুন</option>
                     <?php foreach ($accounts as $account): ?>
-                        <option value="<?php echo $account['id']; ?>">
-                            <?php echo htmlspecialchars($account['name'] . ' (' . ucfirst($account['type']) . ') - BDT ' . number_format($account['current_balance'], 2)); ?>
+                        <option value="<?php echo (int)$account['id']; ?>" <?php echo (int)$account['id'] === $account_id ? 'selected' : ''; ?>>
+                            <?php echo e($account['name'] . ' (' . ucfirst($account['type']) . ') - BDT ' . number_format((float)$account['current_balance'], 2)); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <span><?php echo $account_err; ?></span>
+                <small>আপনি পরিশোধ করলে এই অ্যাকাউন্ট থেকে টাকা যাবে; আপনি পেলে এই অ্যাকাউন্টে আসবে।</small>
+                <span><?php echo e($account_err); ?></span>
             </div>
             <div>
                 <label>বর্ণনা (ঐচ্ছিক):</label>
-                <textarea name="description"><?php echo htmlspecialchars($description); ?></textarea>
+                <textarea name="description"><?php echo e($description); ?></textarea>
             </div>
             <div>
                 <input type="submit" value="পরিশোধ যোগ করুন">
             </div>
-            <p><a href="view_loans.php">ধারের তালিকায় ফিরে যান</a></p>
         </form>
+        <?php endif; ?>
+        <p><a href="view_loans.php">ধারের তালিকায় ফিরে যান</a></p>
     </div>
 </body>
 </html>

@@ -27,6 +27,7 @@
         <a href="add_category.php">ক্যাটাগরি যোগ করুন</a>
 
         <a href="reports.php">রিপোর্ট</a>
+        <a href="check_balances.php">হিসাব যাচাই</a>
         <a href="logout.php" class="logout-link">লগআউট</a>
     </div>
 </div>

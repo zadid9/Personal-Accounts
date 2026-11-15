@@ -58,8 +58,8 @@ mysqli_close($link);
                         <td>BDT <?php echo number_format(htmlspecialchars($loan['paid_amount']), 2); ?></td>
                         <td>BDT <?php echo number_format(htmlspecialchars($loan['amount'] - $loan['paid_amount']), 2); ?></td>
                         <td class="loan-status-<?php echo htmlspecialchars($loan['status']); ?>"><?php echo ucfirst(str_replace('_', ' ', htmlspecialchars($loan['status']))); ?></td>
-                        <td><?php echo htmlspecialchars($loan['due_date']); ?></td>
-                        <td><?php echo htmlspecialchars($loan['notes']); ?></td>
+                        <td><?php echo e($loan['due_date']); ?></td>
+                        <td><?php echo e($loan['notes']); ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
