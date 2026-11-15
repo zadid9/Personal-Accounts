@@ -1,0 +1,19 @@
+document.querySelectorAll('.toggle-password').forEach(function (btn) {
+    var input = document.getElementById(btn.dataset.target);
+    var eyeOpen = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    var eyeClosed = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    btn.addEventListener('click', function () {
+        var show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.querySelector('svg').innerHTML = show ? eyeClosed : eyeOpen;
+        btn.setAttribute('aria-label', show ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখান');
+    });
+});
+
+document.querySelectorAll('form[data-busy-text]').forEach(function (form) {
+    form.addEventListener('submit', function () {
+        var btn = form.querySelector('.submit-btn');
+        btn.disabled = true;
+        btn.textContent = form.dataset.busyText;
+    });
+});

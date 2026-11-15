@@ -1,0 +1,14 @@
+Options -Indexes
+
+# .env, .git and other dotfiles
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Include-only PHP files and repository files that should never be served
+<FilesMatch "^(config|helpers|navbar|account_options|auth_brand)\.php$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "\.(sql|md|example)$|^LICENSE$">
+    Require all denied
+</FilesMatch>
