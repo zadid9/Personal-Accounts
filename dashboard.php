@@ -155,7 +155,7 @@ foreach ($verify_notice as $key => $value) {
 
         <?php if ($me && $me['email_verified_at'] === null): ?>
             <div style="padding:12px; border-radius:6px; background:#fff4e5; border:1px solid #f5c26b; margin-bottom:20px; text-align:left;">
-                আপনার ইমেল (<?php echo e($me['email']); ?>) এখনো যাচাই হয়নি। যাচাই করা থাকলে পাসওয়ার্ড ভুলে গেলে অ্যাকাউন্ট ফিরে পাবেন।
+                আপনার ইমেল (<?php echo e($me['email']); ?>) এখনো যাচাই হয়নি। যাচাই করা থাকলে পাসওয়ার্ড ভুলে গেলে অ্যাকাউন্ট ফিরে পাবেন। যাচাই ইমেল ইনবক্সে না পেলে স্প্যাম ফোল্ডারও দেখুন।
                 <form action="resend_verification.php" method="post" class="inline-form">
                     <?php echo csrf_field(); ?>
                     <button type="submit" class="link-button">যাচাই লিংক পাঠান</button>

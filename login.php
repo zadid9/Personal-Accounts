@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="subtitle">চালিয়ে যেতে আপনার অ্যাকাউন্টে লগইন করুন</p>
 
             <?php if ($registered && $_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
-                <div class="alert success" role="status">অ্যাকাউন্ট তৈরি হয়েছে। আপনার ইমেলে একটি যাচাই লিংক পাঠানো হয়েছে। এখন লগইন করুন।</div>
+                <div class="alert success" role="status">অ্যাকাউন্ট তৈরি হয়েছে। আপনার ইমেলে একটি যাচাই লিংক পাঠানো হয়েছে। ইনবক্সে না পেলে স্প্যাম ফোল্ডারও দেখুন। এখন লগইন করুন।</div>
             <?php endif; ?>
             <?php if (isset($_GET['reset']) && $_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
                 <div class="alert success" role="status">পাসওয়ার্ড বদলানো হয়েছে। নতুন পাসওয়ার্ড দিয়ে লগইন করুন।</div>
