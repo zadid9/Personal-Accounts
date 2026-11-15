@@ -74,7 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="subtitle">চালিয়ে যেতে আপনার অ্যাকাউন্টে লগইন করুন</p>
 
             <?php if ($registered && $_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
-                <div class="alert success" role="status">অ্যাকাউন্ট তৈরি হয়েছে। এখন লগইন করুন।</div>
+                <div class="alert success" role="status">অ্যাকাউন্ট তৈরি হয়েছে। আপনার ইমেলে একটি যাচাই লিংক পাঠানো হয়েছে। এখন লগইন করুন।</div>
+            <?php endif; ?>
+            <?php if (isset($_GET['reset']) && $_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
+                <div class="alert success" role="status">পাসওয়ার্ড বদলানো হয়েছে। নতুন পাসওয়ার্ড দিয়ে লগইন করুন।</div>
             <?php endif; ?>
             <?php if ($general_err): ?>
                 <div class="alert" role="alert"><?php echo e($general_err); ?></div>
@@ -104,6 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <?php if ($password_err): ?><span class="field-error"><?php echo e($password_err); ?></span><?php endif; ?>
                 </div>
+
+                <p style="text-align:right; margin:-6px 0 12px;"><a href="forgot_password.php" style="color:var(--brand); font-size:0.92rem; text-decoration:none;">পাসওয়ার্ড ভুলে গেছেন?</a></p>
 
                 <button type="submit" class="submit-btn">লগইন করুন</button>
             </form>

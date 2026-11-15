@@ -28,6 +28,10 @@ $env = load_env_file($env_file);
 define('APP_DEBUG', strtolower($env['APP_DEBUG'] ?? 'false') === 'true');
 define('ALLOW_REGISTRATION', strtolower($env['ALLOW_REGISTRATION'] ?? 'true') === 'true');
 define('CLIENT_IP_HEADER', $env['CLIENT_IP_HEADER'] ?? '');
+// Links in emails are built from APP_URL, never from the request's Host header.
+define('APP_URL', rtrim($env['APP_URL'] ?? '', '/'));
+define('MAIL_FROM', $env['MAIL_FROM'] ?? '');
+define('MAIL_FROM_NAME', $env['MAIL_FROM_NAME'] ?? 'ব্যক্তিগত হিসাব');
 
 ini_set('display_errors', APP_DEBUG ? '1' : '0');
 ini_set('display_startup_errors', APP_DEBUG ? '1' : '0');

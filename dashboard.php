@@ -115,7 +115,25 @@ if ($stmt = mysqli_prepare($link, $sql_recent_transactions)) {
     mysqli_stmt_close($stmt);
 }
 
-mysqli_close($link); // Moved this line to the very end
+$stmt = mysqli_prepare($link, "SELECT email, email_verified_at FROM users WHERE id = ?");
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+$me = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+mysqli_stmt_close($stmt);
+
+mysqli_close($link);
+
+$verify_notice = [
+    'verify_sent' => ['ok', 'যাচাই লিংক আবার পাঠানো হয়েছে। ইনবক্স ও স্প্যাম ফোল্ডার দেখুন।'],
+    'verify_limit' => ['warn', 'অল্প সময়ে অনেকবার পাঠানো হয়েছে। এক ঘণ্টা পরে আবার চেষ্টা করুন।'],
+    'verify_failed' => ['warn', 'ইমেল পাঠানো যায়নি। কিছুক্ষণ পরে আবার চেষ্টা করুন।'],
+];
+$notice = null;
+foreach ($verify_notice as $key => $value) {
+    if (isset($_GET[$key])) {
+        $notice = $value;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -130,6 +148,20 @@ mysqli_close($link); // Moved this line to the very end
     <?php include 'navbar.php'; ?>
     <div class="container">
         <h2>স্বাগতম, <?php echo htmlspecialchars($_SESSION['username']); ?>!</h2>
+
+        <?php if ($notice): ?>
+            <p style="padding:10px; border-radius:6px; background:<?php echo $notice[0] === 'ok' ? '#e8f8ee' : '#fff4e5'; ?>;"><?php echo e($notice[1]); ?></p>
+        <?php endif; ?>
+
+        <?php if ($me && $me['email_verified_at'] === null): ?>
+            <div style="padding:12px; border-radius:6px; background:#fff4e5; border:1px solid #f5c26b; margin-bottom:20px; text-align:left;">
+                আপনার ইমেল (<?php echo e($me['email']); ?>) এখনো যাচাই হয়নি। যাচাই করা থাকলে পাসওয়ার্ড ভুলে গেলে অ্যাকাউন্ট ফিরে পাবেন।
+                <form action="resend_verification.php" method="post" class="inline-form">
+                    <?php echo csrf_field(); ?>
+                    <button type="submit" class="link-button">যাচাই লিংক পাঠান</button>
+                </form>
+            </div>
+        <?php endif; ?>
 
         <h3>সারসংক্ষেপ (চলতি মাস)</h3>
         <div class="summary-grid">

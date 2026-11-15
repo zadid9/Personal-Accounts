@@ -6,7 +6,7 @@ Options -Indexes
 </FilesMatch>
 
 # Include-only PHP files and repository files that should never be served
-<FilesMatch "^(config|helpers|ledger|navbar|account_options|auth_brand)\.php$">
+<FilesMatch "^(config|helpers|ledger|mailer|account_mail|navbar|account_options|auth_brand)\.php$">
     Require all denied
 </FilesMatch>
 <FilesMatch "\.(sql|md|example)$|^LICENSE$">

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/account_mail.php';
 start_secure_session();
 
 if (!ALLOW_REGISTRATION) {
@@ -17,7 +18,7 @@ const DEFAULT_CATEGORIES = [
                   'স্বাস্থ্য', 'শিক্ষা', 'কেনাকাটা', 'বিনোদন', 'অন্যান্য ব্যয়'],
 ];
 
-function create_user(mysqli $link, string $username, string $email, string $password): void
+function create_user(mysqli $link, string $username, string $email, string $password): int
 {
     mysqli_begin_transaction($link);
     try {
@@ -44,6 +45,7 @@ function create_user(mysqli $link, string $username, string $email, string $pass
         mysqli_stmt_close($stmt);
 
         mysqli_commit($link);
+        return $user_id;
     } catch (Throwable $e) {
         mysqli_rollback($link);
         throw $e;
@@ -108,8 +110,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $general_err = 'এই নেটওয়ার্ক থেকে অল্প সময়ে অনেকগুলো অ্যাকাউন্ট খোলা হয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।';
         } else {
             try {
-                create_user($link, $username, $email, $password);
+                $new_id = create_user($link, $username, $email, $password);
                 record_attempt($link, 'register', null);
+                // Best effort: a mail hiccup must not block signup; they can resend from the dashboard.
+                try {
+                    send_verification_email($link, $new_id, $username, $email);
+                } catch (Throwable $e) {
+                    error_log('register: verification mail failed: ' . $e->getMessage());
+                }
                 header('location: login.php?registered=1');
                 exit;
             } catch (mysqli_sql_exception $e) {
