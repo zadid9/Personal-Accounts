@@ -96,7 +96,9 @@ mysqli_close($link);
         .tx-table .tx-title { word-break: break-word; }
         .tx-table .tx-title small { color: #777; }
         .tx-table .amount { text-align: right; }
-        .tx-table .action-links a { margin-right: 6px; }
+        .tx-table .row-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; margin: 0; white-space: nowrap; }
+        .tx-table .row-actions a, .tx-table .row-actions form { margin: 0; padding: 0; display: inline-block; }
+        .tx-table .row-actions button { width: auto; margin: 0; line-height: inherit; }
         @media (max-width: 768px) {
             .tx-table tr { margin-bottom: 8px; }
             .tx-table td {
@@ -195,12 +197,14 @@ mysqli_close($link);
                             ?>
                         </td>
                         <td data-label="অ্যাকশন" class="fit action-links">
-                            <a href="edit_transaction.php?id=<?php echo $transaction['id']; ?>">সম্পাদনা</a>
-                            <form action="delete_transaction.php" method="post" class="inline-form" onsubmit="return confirm('মুছে ফেলবেন?');">
-                                <?php echo csrf_field(); ?>
-                                <input type="hidden" name="id" value="<?php echo (int)$transaction['id']; ?>">
-                                <button type="submit" class="link-button delete">মুছুন</button>
-                            </form>
+                            <div class="row-actions">
+                                <a href="edit_transaction.php?id=<?php echo (int)$transaction['id']; ?>">সম্পাদনা</a>
+                                <form action="delete_transaction.php" method="post" class="inline-form" onsubmit="return confirm('মুছে ফেলবেন?');">
+                                    <?php echo csrf_field(); ?>
+                                    <input type="hidden" name="id" value="<?php echo (int)$transaction['id']; ?>">
+                                    <button type="submit" class="link-button delete">মুছুন</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>
