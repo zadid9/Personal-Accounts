@@ -1,6 +1,7 @@
 <?php
 require_once 'auth.php';
 require_once 'config.php';
+require_once 'ledger.php';
 
 $user_id = $_SESSION['id'];
 $transactions = [];
@@ -88,6 +89,33 @@ mysqli_close($link);
         .filter-section input[type="submit"]:hover {
             background-color: #0056b3;
         }
+        /* Compact transaction table: short columns shrink to their content, the title column takes the rest. */
+        .tx-table { font-size: 0.92rem; }
+        .tx-table th, .tx-table td { padding: 6px 8px; vertical-align: top; }
+        .tx-table .fit { width: 1%; white-space: nowrap; }
+        .tx-table .tx-title { word-break: break-word; }
+        .tx-table .tx-title small { color: #777; }
+        .tx-table .amount { text-align: right; }
+        .tx-table .action-links a { margin-right: 6px; }
+        @media (max-width: 768px) {
+            .tx-table tr { margin-bottom: 8px; }
+            .tx-table td {
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+                gap: 10px;
+                padding: 5px 10px;
+                text-align: right;
+                width: auto;
+                white-space: normal;
+            }
+            .tx-table td:before {
+                position: static;
+                width: auto;
+                flex-shrink: 0;
+                padding-right: 0;
+            }
+        }
         @media (max-width: 600px) {
             .header-box {
                 flex-direction: column;
@@ -134,31 +162,31 @@ mysqli_close($link);
         <?php if (empty($transactions)): ?>
             <p style="text-align: center; padding: 20px; color: #888;">এই মাসে কোনো লেনদেন পাওয়া যায়নি।</p>
         <?php else: ?>
-            <table>
+            <table class="tx-table">
                 <thead>
                     <tr>
-                        <th>তারিখ</th>
+                        <th class="fit">তারিখ</th>
                         <th>নাম/বিবরণ</th>
-                        <th>প্রকার</th>
+                        <th class="fit">প্রকার</th>
                         <th>ক্যাটাগরি</th>
-                        <th>পরিমাণ</th>
-                        <th>অ্যাকাউন্ট (From/To)</th>
-                        <th>অ্যাকশন</th>
+                        <th class="fit amount">পরিমাণ (BDT)</th>
+                        <th>অ্যাকাউন্ট</th>
+                        <th class="fit">অ্যাকশন</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($transactions as $transaction): ?>
                     <tr>
-                        <td data-label="তারিখ"><?php echo htmlspecialchars($transaction['transaction_date']); ?></td>
-                        <td data-label="নাম/বিবরণ">
+                        <td data-label="তারিখ" class="fit"><?php echo htmlspecialchars($transaction['transaction_date']); ?></td>
+                        <td data-label="নাম/বিবরণ" class="tx-title">
                             <strong><?php echo htmlspecialchars($transaction['title'] ?: 'নাম নেই'); ?></strong>
                             <?php if(!empty($transaction['description'])): ?>
                                 <br><small><i><?php echo htmlspecialchars($transaction['description']); ?></i></small>
                             <?php endif; ?>
                         </td>
-                        <td data-label="প্রকার"><?php echo ucfirst(str_replace('_', ' ', htmlspecialchars($transaction['type']))); ?></td>
+                        <td data-label="প্রকার" class="fit"><?php echo e(TRANSACTION_TYPES[$transaction['type']] ?? $transaction['type']); ?></td>
                         <td data-label="ক্যাটাগরি"><?php echo htmlspecialchars($transaction['category']); ?></td>
-                        <td data-label="পরিমাণ"><strong>BDT <?php echo number_format($transaction['amount'], 2); ?></strong></td>
+                        <td data-label="পরিমাণ (BDT)" class="fit amount"><strong><?php echo number_format($transaction['amount'], 2); ?></strong></td>
                         <td data-label="অ্যাকাউন্ট">
                             <?php 
                                 if($transaction['type'] == 'income' || $transaction['type'] == 'loan_received') echo "To: " . htmlspecialchars($transaction['to_account_name']);
@@ -166,7 +194,7 @@ mysqli_close($link);
                                 else echo htmlspecialchars($transaction['from_account_name']) . " -> " . htmlspecialchars($transaction['to_account_name']);
                             ?>
                         </td>
-                        <td data-label="অ্যাকশন" class="action-links">
+                        <td data-label="অ্যাকশন" class="fit action-links">
                             <a href="edit_transaction.php?id=<?php echo $transaction['id']; ?>">সম্পাদনা</a>
                             <form action="delete_transaction.php" method="post" class="inline-form" onsubmit="return confirm('মুছে ফেলবেন?');">
                                 <?php echo csrf_field(); ?>
