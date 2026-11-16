@@ -17,7 +17,9 @@ $start_date = $selected_month . '-01';
 $end_date = date('Y-m-t', strtotime($start_date));
 
 // SQL কুয়েরি
-$sql = "SELECT t.id, t.transaction_date, t.title, t.amount, t.description, t.type, t.category, 
+// created_at is a DATETIME in the DB server's local time; convert it to Bangladesh time for display.
+$sql = "SELECT t.id, t.transaction_date, t.title, t.amount, t.description, t.type, t.category,
+               CONVERT_TZ(t.created_at, @@session.time_zone, '+06:00') AS entered_at,
                fa.name AS from_account_name, ta.name AS to_account_name,
                l.party_name AS loan_party_name, l.type AS loan_type
         FROM transactions t
@@ -96,6 +98,7 @@ mysqli_close($link);
         .tx-table .tx-title { word-break: break-word; }
         .tx-table .tx-title small { color: #777; }
         .tx-table .amount { text-align: right; }
+        .tx-table .entered-at { display: block; color: #888; font-size: 0.8em; margin: 0; }
         .tx-table .row-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; margin: 0; white-space: nowrap; }
         .tx-table .row-actions a, .tx-table .row-actions form { margin: 0; padding: 0; display: inline-block; }
         .tx-table .row-actions button { width: auto; margin: 0; line-height: inherit; }
@@ -179,7 +182,14 @@ mysqli_close($link);
                 <tbody>
                     <?php foreach ($transactions as $transaction): ?>
                     <tr>
-                        <td data-label="তারিখ" class="fit"><?php echo htmlspecialchars($transaction['transaction_date']); ?></td>
+                        <td data-label="তারিখ" class="fit">
+                            <div>
+                                <?php echo e($transaction['transaction_date']); ?>
+                                <?php if (!empty($transaction['entered_at'])): ?>
+                                    <small class="entered-at" title="যখন এন্ট্রি করা হয়েছে">এন্ট্রি: <?php echo e(date('d M Y, h:i A', strtotime($transaction['entered_at']))); ?></small>
+                                <?php endif; ?>
+                            </div>
+                        </td>
                         <td data-label="নাম/বিবরণ" class="tx-title">
                             <strong><?php echo htmlspecialchars($transaction['title'] ?: 'নাম নেই'); ?></strong>
                             <?php if(!empty($transaction['description'])): ?>
